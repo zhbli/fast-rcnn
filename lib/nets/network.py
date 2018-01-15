@@ -364,8 +364,16 @@ class Network(nn.Module):
 
     # build the anchors for the image
     self._anchor_component(net_conv.size(2), net_conv.size(3))
-   
-    rois = self._region_proposal(net_conv)
+
+    #zhbli
+    import global_var
+    rois = global_var.global_roi
+    if type(None) == type(rois):
+      rois = self._region_proposal(net_conv)
+    else:
+      self._predictions["rois"] = rois
+    #zhbli
+
     if cfg.POOLING_MODE == 'crop':
       pool5 = self._crop_pool_layer(net_conv, rois)
     else:

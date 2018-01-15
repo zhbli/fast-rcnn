@@ -1,3 +1,6 @@
+# Base Info
+python version: 3.6.2
+
 # Usage
 
 ## trainval_net.py

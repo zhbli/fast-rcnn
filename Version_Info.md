@@ -8,3 +8,11 @@ Change dictionary config to run the code successfully.
 Train net with ground_truth boxes:  
 - Regard only classify_ loss as total loss.
 - Ignore RPN.
+
+# v2.0
+Detect any roi.
+
+Changed files:
+- [Add] test_any_roi.oy
+- [Add] global_var.py
+- [Modify] network.py

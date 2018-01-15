@@ -154,7 +154,7 @@ class Network(nn.Module):
   def _proposal_target_layer(self, rois, roi_scores):
     rois, roi_scores, labels, bbox_targets, bbox_inside_weights, bbox_outside_weights = \
       proposal_target_layer(
-      rois, roi_scores, self._gt_boxes, self._num_classes)
+      rois, roi_scores, self._gt_boxes, self._num_classes, self.gt_truncated, self._im_info)
 
     self._proposal_targets['rois'] = rois
     self._proposal_targets['labels'] = labels.long()
@@ -226,7 +226,9 @@ class Network(nn.Module):
     self._losses['rpn_cross_entropy'] = rpn_cross_entropy
     self._losses['rpn_loss_box'] = rpn_loss_box
 
-    loss = cross_entropy + loss_box + rpn_cross_entropy + rpn_loss_box
+    #loss = cross_entropy + loss_box + rpn_cross_entropy + rpn_loss_box
+    loss = cross_entropy
+
     self._losses['total_loss'] = loss
 
     for k in self._losses.keys():

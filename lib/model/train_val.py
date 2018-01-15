@@ -248,14 +248,24 @@ class SolverWrapper(object):
       # Get training data, one batch at a time
       blobs = self.data_layer.forward()
 
+      #zhbli
+      self.net.gt_truncated = blobs['truncated']
+      #zhbli
+
       now = time.time()
-      if iter == 1 or now - last_summary_time > cfg.TRAIN.SUMMARY_INTERVAL:
+      #if iter == 1 or now - last_summary_time > cfg.TRAIN.SUMMARY_INTERVAL:
+      if False:
         # Compute the graph with summary
         rpn_loss_cls, rpn_loss_box, loss_cls, loss_box, total_loss, summary = \
           self.net.train_step_with_summary(blobs, self.optimizer)
         for _sum in summary: self.writer.add_summary(_sum, float(iter))
         # Also check the summary on the validation set
         blobs_val = self.data_layer_val.forward()
+
+        # zhbli
+        self.net.gt_truncated = blobs_val['truncated']
+        # zhbli
+
         summary_val = self.net.get_summary(blobs_val)
         for _sum in summary_val: self.valwriter.add_summary(_sum, float(iter))
         last_summary_time = now

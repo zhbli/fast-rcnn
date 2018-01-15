@@ -161,6 +161,10 @@ class pascal_voc(imdb):
     # "Seg" area for pascal is just the box area
     seg_areas = np.zeros((num_objs), dtype=np.float32)
 
+    # zhbli
+    truncated = np.zeros((num_objs), dtype=np.bool)
+    # zhbli
+
     # Load object bounding boxes into a data frame.
     for ix, obj in enumerate(objs):
       bbox = obj.find('bndbox')
@@ -175,13 +179,18 @@ class pascal_voc(imdb):
       overlaps[ix, cls] = 1.0
       seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
 
+      # zhbli
+      truncated[ix] = bool(float(obj.find('truncated').text))
+      # zhbli
+
     overlaps = scipy.sparse.csr_matrix(overlaps)
 
     return {'boxes': boxes,
             'gt_classes': gt_classes,
             'gt_overlaps': overlaps,
             'flipped': False,
-            'seg_areas': seg_areas}
+            'seg_areas': seg_areas,
+            'truncated': truncated}
 
   def _get_comp_id(self):
     comp_id = (self._comp_id + '_' + self._salt if self.config['use_salt']

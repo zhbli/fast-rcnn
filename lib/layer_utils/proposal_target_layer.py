@@ -18,7 +18,7 @@ from utils.bbox import bbox_overlaps
 import torch
 from torch.autograd import Variable
 
-def proposal_target_layer(rpn_rois, rpn_scores, gt_boxes, _num_classes):
+def proposal_target_layer(rpn_rois, rpn_scores, gt_boxes, _num_classes, gt_truncated, im_info):
   """
   Assign object detection proposals to ground-truth targets. Produces proposal
   classification labels and bounding-box regression targets.
@@ -44,9 +44,11 @@ def proposal_target_layer(rpn_rois, rpn_scores, gt_boxes, _num_classes):
 
   # Sample rois with classification labels and bounding box regression
   # targets
-  labels, rois, roi_scores, bbox_targets, bbox_inside_weights = _sample_rois(
-    all_rois, all_scores, gt_boxes, fg_rois_per_image,
-    rois_per_image, _num_classes)
+
+  #zhbli
+  labels, rois, roi_scores, bbox_targets, bbox_inside_weights = _sample_rois_manually(
+      gt_boxes, fg_rois_per_image, rois_per_image, _num_classes, gt_truncated, im_info)
+  #zhbli
 
   rois = rois.view(-1, 5)
   roi_scores = roi_scores.view(-1)
@@ -101,6 +103,124 @@ def _compute_targets(ex_rois, gt_rois, labels):
   return torch.cat(
     [labels.unsqueeze(1), targets], 1)
 
+
+def _sample_rois_manually(gt_boxes_origin, fg_rois_per_image, rois_per_image, num_classes, gt_truncated, im_info):
+    """Args:
+    gt_boxes_origin: Variable, [gt_num, 5], [x1, y1, x2, y2, class_id]
+    fg_rois_per_image: int, 64
+    rois_per_image: float, 256.0
+    num_classes: int, 21
+    gt_truncated: ndarray.bool, [gt_num]
+    """
+    fg_num = fg_rois_per_image
+    rois_per_image = int(rois_per_image)
+    gt_boxes_origin = gt_boxes_origin.data.cpu()
+    img_width = float(im_info[0])
+    img_height = float(im_info[1])
+
+    """Remove truncated gt_boxes"""
+    gt_truncated = gt_truncated.astype(int)
+    gt_truncated = torch.from_numpy(gt_truncated)
+    truncated_idx = (gt_truncated == 0).nonzero().view(-1)
+
+    if len(truncated_idx) != 0:
+        gt_boxes = torch.index_select(gt_boxes_origin, 0, truncated_idx)
+        untruncted_gt_num = len(gt_boxes)
+
+        """get width and height of every untruncated gt_box"""
+        width = gt_boxes[:, 2] - gt_boxes[:, 0]  # x2-x1
+        height = gt_boxes[:, 3] - gt_boxes[:, 1]
+
+        """for every untruncated gt_box:"""
+        for i in range(untruncted_gt_num):
+            # get the number of fg_rois that the ith gt should generate.
+            if i == untruncted_gt_num - 1:
+                fg_num_per_gt = fg_rois_per_image - (untruncted_gt_num - 1) * int(fg_rois_per_image / untruncted_gt_num)
+            else:
+                fg_num_per_gt = int(fg_rois_per_image / untruncted_gt_num)
+
+            # get the width and height delta.
+            delta = torch.rand(fg_num_per_gt, 4) * 0.2 - 0.1  # [-0.1, 0.1)
+            delta = delta * torch.FloatTensor([width[i], height[i], width[i], height[i]])
+
+            if i == 0:
+                fg_rois = delta + gt_boxes[i, :-1]
+                labels = torch.ones(fg_num_per_gt) * gt_boxes[i, 4]
+            else:
+                fg_rois = torch.cat((fg_rois, delta + gt_boxes[i, :-1]))
+                labels = torch.cat((labels, torch.ones(fg_num_per_gt) * gt_boxes[i, 4]))
+
+        """manage the boundary"""
+        fg_rois[:, 0] = torch.max(torch.FloatTensor([0]), fg_rois[:, 0])
+        fg_rois[:, 1] = torch.min(torch.FloatTensor([img_width]), fg_rois[:, 1])
+        fg_rois[:, 2] = torch.max(torch.FloatTensor([0]), fg_rois[:, 2])
+        fg_rois[:, 3] = torch.min(torch.FloatTensor([img_height]), fg_rois[:, 3])
+    else:
+        fg_num = 0
+        fg_rois = torch.FloatTensor()
+        gt_boxes = torch.FloatTensor()
+        labels = torch.FloatTensor()
+
+    """ generate bg_rois """
+    bg_num = rois_per_image - fg_num
+    labels = torch.cat((labels, torch.zeros(bg_num)))
+    x1_bg = (torch.rand(bg_num * 2) * img_width).type(torch.FloatTensor)
+    y1_bg = (torch.rand(bg_num * 2) * img_height).type(torch.FloatTensor)
+    if fg_num != 0:
+        bg_width = torch.min(width) + torch.rand(bg_num * 2) * (torch.max(width) - torch.min(width))
+        bg_height = torch.min(height) + torch.rand(bg_num * 2) * (torch.max(height) - torch.min(height))
+    else:
+        width_origin = gt_boxes_origin[:, 2] - gt_boxes_origin[:, 0]  # x2-x1
+        height_origin = gt_boxes_origin[:, 3] - gt_boxes_origin[:, 1]
+        bg_width = torch.min(width_origin) + torch.rand(bg_num * 2) * (
+        torch.max(width_origin) - torch.min(width_origin))
+        bg_height = torch.min(height_origin) + torch.rand(bg_num * 2) * (
+        torch.max(height_origin) - torch.min(height_origin))
+    x2_bg = x1_bg + bg_width
+    y2_bg = y1_bg + bg_height
+    bg_rois = torch.cat(
+        (torch.unsqueeze(x1_bg, 1), torch.unsqueeze(y1_bg, 1), torch.unsqueeze(x2_bg, 1), torch.unsqueeze(y2_bg, 1)), 1)
+
+    """cannot overlap with every gt"""
+    overlaps = bbox_overlaps(bg_rois, gt_boxes_origin[:, :-1])
+    max_overlaps, _ = overlaps.max(1)
+    bg_inds = (max_overlaps == 0).nonzero().view(-1)
+    if len(bg_inds) != 0:
+        bg_rois = bg_rois[bg_inds]
+    else:  # Rare case: gt too large, no bg
+        bg_rois = torch.unsqueeze(torch.FloatTensor([10, 10, 20, 20]), 0)
+    # manage the bound
+    bg_inds = (bg_rois[:, 0] >= 0).numpy() & (bg_rois[:, 1] <= img_width).numpy() & \
+              (bg_rois[:, 2] >= 0).numpy() & (bg_rois[:, 3] <= img_height).numpy()
+    if max(bg_inds==0):
+        bg_rois = torch.unsqueeze(torch.FloatTensor([10, 10, 20, 20]), 0)
+        bg_inds = np.asarray([1])
+    bg_inds = torch.FloatTensor(bg_inds.astype(float)).nonzero().view(-1)
+
+    """select 256-64 bg randomly"""
+    to_replace = bg_inds.numel() < bg_num
+    bg_inds = bg_inds[
+        torch.from_numpy(npr.choice(np.arange(0, bg_inds.numel()), size=int(bg_num), replace=to_replace)).long()]
+    bg_rois = bg_rois[bg_inds]
+
+    """set return vars"""
+    rois = torch.cat((fg_rois, bg_rois), 0)
+    rois = torch.cat((torch.zeros(len(rois), 1), rois), 1)
+    rois = Variable(rois.type(torch.cuda.FloatTensor), requires_grad=True)
+    labels = Variable(labels.type(torch.cuda.FloatTensor), requires_grad=False)
+    roi_scores = Variable(torch.zeros(256,1).type(torch.cuda.FloatTensor), requires_grad=True)
+    bbox_targets = torch.zeros(256, 84).type(torch.cuda.FloatTensor)
+    bbox_inside_weights = torch.zeros(256, 84).type(torch.cuda.FloatTensor)
+
+    assert len(rois)==256, "len"
+    return labels, rois, roi_scores, bbox_targets, bbox_inside_weights
+    """return:
+    labels: Variable, torch.cuda.FloatTensor of size 256, require_grad=False
+    rois: Variable, [256, 5], first column are all zeros, require_grad=True
+    [x] roi_scores: no use. Variable, [256,1]
+    [x] bbox_targets: no use. FloatTensor, [256, 84]
+    [x] bbox_inside_weights: no use. FloatTensor, [256, 84]
+    """
 
 def _sample_rois(all_rois, all_scores, gt_boxes, fg_rois_per_image, rois_per_image, num_classes):
   """Generate a random sample of RoIs comprising foreground and background

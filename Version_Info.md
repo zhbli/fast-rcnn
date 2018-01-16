@@ -24,3 +24,11 @@ Change list:
 - [Add_func] genarate_truncated_rois
 - [Modify_func] _sample_rois_manually
 - [Modify_file] imdb.py
+
+# v4.0
+Generate attention heat map.
+
+Usage: Run `test_any_roi.py`
+
+Change list:
+- [Modify_file] test_any_roi.py

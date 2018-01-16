@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import os
 import cv2
 import numpy as np
 import _init_paths
@@ -14,10 +14,10 @@ from model.nms_wrapper import nms
 import matplotlib.pyplot as plt
 
 global img
-global point1, point2
+global point1, point2, roi
 def on_mouse(event, x, y, flags, param):
     print('hehe')
-    global img, point1, point2
+    global img, point1, point2, roi
     img2 = img.copy()
     if event == cv2.EVENT_LBUTTONDOWN:         #左键点击
         point1 = (x,y)
@@ -35,7 +35,7 @@ def on_mouse(event, x, y, flags, param):
         y1 = min(point1[1],point2[1])
         x2 = max(point1[0], point2[0])
         y2 = max(point1[1], point2[1])
-
+        roi = np.asarray([x1, y1, x2, y2])
         """resize roi"""
         im_shape = img.shape
         im_size_min = min(im_shape[0:2])
@@ -51,7 +51,7 @@ def on_mouse(event, x, y, flags, param):
         global_var.global_roi = global_roi
         """resize roi"""
         print("resize ok")
-
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 def main():
     global img
     net = resnetv1(num_layers=50)
@@ -63,9 +63,37 @@ def main():
     net.eval()
     net.cuda()
 
+    # v4.0
+    # hook the feature extractor
+    finalconv_name = 'resnet'
+    features_blobs = []  # shape shoule be [2048, 7, 7]
+
+    def hook_feature(module, input, output):
+        features_blobs.append(output.data.cpu().numpy())
+
+    net._modules.get(finalconv_name)._modules.get('layer4').register_forward_hook(hook_feature)
+    # get the softmax weight
+    params = list(net.parameters())
+    weight_softmax = np.squeeze(params[-4].data.cpu().numpy()) # shape = [41, 2048]
+
+    def returnCAM(feature_conv, weight_softmax, class_idx):
+        # generate the class activation maps upsample to 256x256
+        size_upsample = (256, 256)
+        bz, nc, h, w = feature_conv.shape
+        output_cam = []
+        for idx in class_idx:
+            cam = weight_softmax[class_idx].dot(feature_conv.reshape((nc, h * w)))
+            cam = cam.reshape(h, w)
+            cam = cam - np.min(cam)
+            cam_img = cam / np.max(cam)
+            cam_img = np.uint8(255 * cam_img)
+            output_cam.append(cv2.resize(cam_img, size_upsample))
+        return output_cam
+    # v4.0
+
     """loop"""
     while 1:
-        img = cv2.imread('/data/zhbli/VOCdevkit/VOC2007/JPEGImages/004545.jpg')
+        img = cv2.imread('/data/zhbli/VOCdevkit/VOC2007/JPEGImages/002092.jpg')
         assert img is not None, "fail to load img"
         cv2.namedWindow('image')
         cv2.setMouseCallback('image', on_mouse)
@@ -90,6 +118,14 @@ def main():
         idx = np.argmax(scores, 1).squeeze()
         box = boxes[:, 4 * idx:4 * (idx + 1)][0]
         cls = CLASSES[idx]
+
+        # v4.0
+        CAMs = returnCAM(features_blobs[0], weight_softmax, [idx])
+        heatmap = cv2.applyColorMap(cv2.resize(CAMs[0], (roi[2]-roi[0], roi[3]-roi[1])), cv2.COLORMAP_JET)
+        result = heatmap * 0.3 + img[roi[1]:roi[3], roi[0]:roi[2], :] * 0.5
+        cv2.imwrite('CAM.jpg', result)
+        # v4.0
+
         im = img[:, :, (2, 1, 0)]
         fig, ax = plt.subplots(figsize=(12, 12))
         ax.imshow(im, aspect='equal')

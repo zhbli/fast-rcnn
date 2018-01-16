@@ -20,7 +20,8 @@ __C.TRAIN = edict()
 
 # Initial learning rate
 #__C.TRAIN.LEARNING_RATE = 0.001
-__C.TRAIN.LEARNING_RATE = 0.0005
+#__C.TRAIN.LEARNING_RATE = 0.0005 # vgg16
+__C.TRAIN.LEARNING_RATE = 0.0002 # res50
 
 # Momentum
 __C.TRAIN.MOMENTUM = 0.9

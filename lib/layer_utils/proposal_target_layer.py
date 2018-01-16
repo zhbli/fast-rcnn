@@ -103,7 +103,41 @@ def _compute_targets(ex_rois, gt_rois, labels):
   return torch.cat(
     [labels.unsqueeze(1), targets], 1)
 
+# Added in version 3.0
+def genarate_truncated_rois(gt_boxes, fg_rois_per_image):
+    """Args:
+    gt_boxes: FloatTensor, [gt_num, 4]
+    fg_rois_per_image: int, 64
+    num_classes: int, 41
+    """
+    gt_boxes = gt_boxes.numpy()
+    truncated_ratio = 1 / 3.0
+    truncated_num = fg_rois_per_image
+    sample_idx = np.random.choice(range(len(gt_boxes)), truncated_num)
+    x1 = np.expand_dims(gt_boxes[sample_idx, 0], 1)
+    y1 = np.expand_dims(gt_boxes[sample_idx, 1], 1)
+    x2 = np.expand_dims(gt_boxes[sample_idx, 2], 1)
+    y2 = np.expand_dims(gt_boxes[sample_idx, 3], 1)
+    truncated_label = gt_boxes[sample_idx, 4] + 20
+    sizes = (x2 - x1) * (y2 - y1) * truncated_ratio
+    width = x2 - x1
+    height = y2 - y1
+    w_truncated = np.random.rand(truncated_num, 1) * (width - sizes / height) + sizes / height  # [sizes/height, width]
+    h_truncated = sizes / w_truncated
+    s1 = np.random.rand(truncated_num, 1) * ((x2 - w_truncated) - x1) + x1
+    t1 = np.random.rand(truncated_num, 1) * ((y2 - h_truncated) - y1) + y1
+    s2 = s1 + w_truncated
+    t2 = t1 + h_truncated
+    truncated_rois = np.concatenate((s1, t1, s2, t2), 1)
 
+    truncated_rois = torch.from_numpy(truncated_rois).type(torch.FloatTensor)
+    truncated_label = torch.from_numpy(truncated_label).type(torch.FloatTensor)
+    truncated_rois_num = truncated_num
+
+    return truncated_rois, truncated_label, truncated_rois_num
+
+
+# Added in version v1.0
 def _sample_rois_manually(gt_boxes_origin, fg_rois_per_image, rois_per_image, num_classes, gt_truncated, im_info):
     """Args:
     gt_boxes_origin: Variable, [gt_num, 5], [x1, y1, x2, y2, class_id]
@@ -161,9 +195,16 @@ def _sample_rois_manually(gt_boxes_origin, fg_rois_per_image, rois_per_image, nu
         gt_boxes = torch.FloatTensor()
         labels = torch.FloatTensor()
 
+    """v3.0: generate truncated_rois"""
+    if len(gt_boxes) != 0:
+        truncated_rois, truncated_label, truncated_rois_num = genarate_truncated_rois(gt_boxes, fg_rois_per_image)
+    else:
+        truncated_rois = torch.FloatTensor()
+        truncated_label = torch.FloatTensor()
+        truncated_rois_num = 0
+
     """ generate bg_rois """
-    bg_num = rois_per_image - fg_num
-    labels = torch.cat((labels, torch.zeros(bg_num)))
+    bg_num = rois_per_image - fg_num - truncated_rois_num
     x1_bg = (torch.rand(bg_num * 2) * img_width).type(torch.FloatTensor)
     y1_bg = (torch.rand(bg_num * 2) * img_height).type(torch.FloatTensor)
     if fg_num != 0:
@@ -204,13 +245,14 @@ def _sample_rois_manually(gt_boxes_origin, fg_rois_per_image, rois_per_image, nu
     bg_rois = bg_rois[bg_inds]
 
     """set return vars"""
-    rois = torch.cat((fg_rois, bg_rois), 0)
-    rois = torch.cat((torch.zeros(len(rois), 1), rois), 1)
+    rois = torch.cat((fg_rois, truncated_rois, bg_rois), 0)
+    rois = torch.cat((torch.zeros(len(rois), 1), rois), 1)  # add 0s at first column.
     rois = Variable(rois.type(torch.cuda.FloatTensor), requires_grad=True)
+    labels = torch.cat((labels, truncated_label, torch.zeros(bg_num)))
     labels = Variable(labels.type(torch.cuda.FloatTensor), requires_grad=False)
     roi_scores = Variable(torch.zeros(256,1).type(torch.cuda.FloatTensor), requires_grad=True)
-    bbox_targets = torch.zeros(256, 84).type(torch.cuda.FloatTensor)
-    bbox_inside_weights = torch.zeros(256, 84).type(torch.cuda.FloatTensor)
+    bbox_targets = torch.zeros(256, num_classes*4).type(torch.cuda.FloatTensor)
+    bbox_inside_weights = torch.zeros(256, num_classes*4).type(torch.cuda.FloatTensor)
 
     assert len(rois)==256, "len"
     return labels, rois, roi_scores, bbox_targets, bbox_inside_weights

@@ -5,6 +5,7 @@ import numpy as np
 import _init_paths
 from model.test import im_detect
 from nets.vgg16 import vgg16
+from nets.resnet_v1 import resnetv1
 from model.config import cfg
 import global_var
 import torch
@@ -53,10 +54,10 @@ def on_mouse(event, x, y, flags, param):
 
 def main():
     global img
-    net = vgg16()
-    net.create_architecture(21,
+    net = resnetv1(num_layers=50)
+    net.create_architecture(41,
                             tag='default', anchor_scales=[8, 16, 32])
-    saved_model = '/home/zhbli/Project/fast-rcnn/output/vgg16/voc_2007_trainval/default/vgg16_faster_rcnn_iter_70000.pth'
+    saved_model = '/home/zhbli/Project/fast-rcnn/output/res50/voc_2007_trainval/default/res50_faster_rcnn_iter_70000.pth'
     net.load_state_dict(torch.load(saved_model))
 
     net.eval()
@@ -64,7 +65,7 @@ def main():
 
     """loop"""
     while 1:
-        img = cv2.imread('/data/zhbli/VOCdevkit/VOC2007/JPEGImages/001867.jpg')
+        img = cv2.imread('/data/zhbli/VOCdevkit/VOC2007/JPEGImages/004545.jpg')
         assert img is not None, "fail to load img"
         cv2.namedWindow('image')
         cv2.setMouseCallback('image', on_mouse)
@@ -79,7 +80,13 @@ def main():
                    'bottle', 'bus', 'car', 'cat', 'chair',
                    'cow', 'diningtable', 'dog', 'horse',
                    'motorbike', 'person', 'pottedplant',
-                   'sheep', 'sofa', 'train', 'tvmonitor')
+                   'sheep', 'sofa', 'train', 'tvmonitor',
+                   'aeroplane_truncated', 'bicycle_truncated', 'bird_truncated', 'boat_truncated',
+                   'bottle_truncated', 'bus_truncated', 'car_truncated', 'cat_truncated', 'chair_truncated',
+                   'cow_truncated', 'diningtable_truncated', 'dog_truncated', 'horse_truncated',
+                   'motorbike_truncated', 'person_truncated', 'pottedplant_truncated',
+                   'sheep_truncated', 'sofa_truncated', 'train_truncated', 'tvmonitor_truncated'
+                   )
         idx = np.argmax(scores, 1).squeeze()
         box = boxes[:, 4 * idx:4 * (idx + 1)][0]
         cls = CLASSES[idx]

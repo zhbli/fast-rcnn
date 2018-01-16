@@ -250,6 +250,8 @@ class SolverWrapper(object):
 
       #zhbli
       self.net.gt_truncated = blobs['truncated']
+      if np.all(self.net.gt_truncated) == True:  # all is true(truncated)
+        continue
       #zhbli
 
       now = time.time()

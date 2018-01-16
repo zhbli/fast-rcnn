@@ -34,13 +34,19 @@ class imdb(object):
     # Use this dict for storing dataset specific config options
     self.config = {}
 
+    # v3.0
+    self.num_classes = 41
+    # v3.0
+
   @property
   def name(self):
     return self._name
 
-  @property
-  def num_classes(self):
-    return len(self._classes)
+  # v3.0
+  # @property
+  # def num_classes(self):
+  #   return len(self._classes)
+  # v3.0
 
   @property
   def classes(self):

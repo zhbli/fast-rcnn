@@ -12,7 +12,15 @@ Train net with ground_truth boxes:
 # v2.0
 Detect any roi.
 
-Changed files:
-- [Add] test_any_roi.oy
+Change list:
+- [Add] test_any_roi.py
 - [Add] global_var.py
 - [Modify] network.py
+
+# v3.0
+Train truncated objects.
+
+Change list:
+- [Add_func] genarate_truncated_rois
+- [Modify_func] _sample_rois_manually
+- [Modify_file] imdb.py

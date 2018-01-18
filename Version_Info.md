@@ -32,3 +32,11 @@ Usage: Run `test_any_roi.py`
 
 Change list:
 - [Modify_file] test_any_roi.py
+
+# v4.1
+Save every ground_truth's attention_heat_map.
+
+Usage: Run `save_gt_attention_map.py`
+
+Change list:
+- [Add_file] save_gt_attention_map.py

@@ -66,10 +66,10 @@ def main():
     # v4.0
     # hook the feature extractor
     finalconv_name = 'resnet'
-    features_blobs = []  # shape shoule be [2048, 7, 7]
+    features_blobs = [-1]  # shape shoule be [2048, 7, 7]
 
     def hook_feature(module, input, output):
-        features_blobs.append(output.data.cpu().numpy())
+        features_blobs[0] = output.data.cpu().numpy()
 
     net._modules.get(finalconv_name)._modules.get('layer4').register_forward_hook(hook_feature)
     # get the softmax weight
@@ -93,7 +93,7 @@ def main():
 
     """loop"""
     while 1:
-        img = cv2.imread('/data/zhbli/VOCdevkit/VOC2007/JPEGImages/002092.jpg')
+        img = cv2.imread('/data/zhbli/VOCdevkit/VOC2007/JPEGImages/000698.jpg')
         assert img is not None, "fail to load img"
         cv2.namedWindow('image')
         cv2.setMouseCallback('image', on_mouse)

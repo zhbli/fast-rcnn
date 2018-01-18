@@ -40,3 +40,11 @@ Usage: Run `save_gt_attention_map.py`
 
 Change list:
 - [Add_file] save_gt_attention_map.py
+
+# v4.2
+Save every ground_truth.
+
+Usage: Run `save_gt.py`
+
+Change list:
+- [Add_file] save_gt.py

@@ -142,8 +142,8 @@ for i in range(len(recs)):
 
         # v4.0
         CAM = returnCAM(features_blobs[0], weight_softmax, [true_idx])
-        heatmap = cv2.resize(CAM, (bbox[2] - bbox[0], bbox[3] - bbox[1]))
-        all_attention_maps[imagenames[i]].append(heatmap)
+        # heatmap = cv2.resize(CAM, (bbox[2] - bbox[0], bbox[3] - bbox[1]))
+        all_attention_maps[imagenames[i]].append(CAM)
 
 save_file_name = '/data/zhbli/VOCdevkit/results/VOC2007/CAM/all_attention_maps.pkl'
 save_file = open(save_file_name, 'wb')

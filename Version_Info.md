@@ -51,6 +51,7 @@ Change list:
 
 # v4.3
 Save every ground_truth's attention_heat_map.
+The data_structure of every map is 7*7 ndarray.
 Result will be saved in .pkl file.
 
 Diff with v4.1:

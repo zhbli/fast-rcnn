@@ -116,6 +116,9 @@ for i in range(len(recs)):
     for j in range(len(recs[imagenames[i]])):
     # for every gt
         print('testing img_{:s}, gt_{:d}'.format(imagenames[i], j))
+        difficult = recs[imagenames[i]][j]['difficult']
+        if difficult:
+            continue
         class_name = recs[imagenames[i]][j]['name']
         bbox = recs[imagenames[i]][j]['bbox']
 

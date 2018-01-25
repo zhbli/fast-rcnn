@@ -57,6 +57,7 @@ Result will be saved in .pkl file.
 Diff with v4.1:
 - Just save the heat map value, will not save the original image.
 - Donot normalize the heat map value to [0, 255].
+- difficult gts will not be saved.
 
 Usage: Run `save_gt_attention_map_v43.py`
 

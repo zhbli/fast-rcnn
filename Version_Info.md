@@ -48,3 +48,16 @@ Usage: Run `save_gt.py`
 
 Change list:
 - [Add_file] save_gt.py
+
+# v4.3
+Save every ground_truth's attention_heat_map.
+Result will be saved in .pkl file.
+
+Diff with v4.1:
+- Just save the heat map value, will not save the original image.
+- Donot normalize the heat map value to [0, 255].
+
+Usage: Run `save_gt_attention_map_v43.py`
+
+Change list:
+- [Add_flie] save_gt_attention_map_v43.py
